@@ -1,0 +1,49 @@
+name: Build and Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [ main, master, remaster ]
+  pull_request:
+    branches: [ main, master, remaster ]
+
+env:
+  HAXE_VERSION: 4.2.5
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Install Haxe
+      uses: krdlab/setup-haxe@v1
+      with:
+        haxe-version: ${{ env.HAXE_VERSION }}
+    
+    - name: Install Lime
+      run: |
+        haxelib install lime
+        haxelib install openfl
+        haxelib install flixel
+        haxelib install flixel-addons
+        haxelib install flixel-ui
+        haxelib install hscript
+        haxelib install polymod
+        haxelib setup lime
+    
+    - name: Build HTML5
+      run: lime build html5 -final
+    
+    - name: Prepare GitHub Pages
+      run: |
+        mkdir -p docs/game
+        cp -r export/release/html5/bin/* docs/game/
+    
+    - name: Deploy to GitHub Pages
+      if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' || github.ref == 'refs/heads/remaster')
+      uses: peaceiris/actions-gh-pages@v3
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        publish_dir: ./docs
+        cname: # Add your custom domain here if you have one
