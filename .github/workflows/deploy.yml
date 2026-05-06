@@ -3,26 +3,31 @@ name: Build and Deploy to GitHub Pages
 on:
   push:
     branches: [ main, master, remaster ]
-  pull_request:
-    branches: [ main, master, remaster ]
 
 env:
   HAXE_VERSION: 4.2.5
 
 jobs:
-  build:
+  build-and-deploy:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
     
     steps:
     - uses: actions/checkout@v3
+      with:
+        fetch-depth: 0
     
-    - name: Install Haxe
+    - name: Setup Haxe
       uses: krdlab/setup-haxe@v1
       with:
         haxe-version: ${{ env.HAXE_VERSION }}
     
-    - name: Install Lime
+    - name: Install dependencies
       run: |
+        haxelib newrepo
         haxelib install lime
         haxelib install openfl
         haxelib install flixel
@@ -32,18 +37,31 @@ jobs:
         haxelib install polymod
         haxelib setup lime
     
-    - name: Build HTML5
+    - name: Build HTML5 Release
       run: lime build html5 -final
+      continue-on-error: false
     
-    - name: Prepare GitHub Pages
+    - name: Setup Pages
+      uses: actions/configure-pages@v3
+    
+    - name: Prepare deployment
       run: |
         mkdir -p docs/game
-        cp -r export/release/html5/bin/* docs/game/
+        if [ -d "export/release/html5/bin" ]; then
+          cp -r export/release/html5/bin/* docs/game/
+          echo "Build copied successfully"
+          ls -la docs/game/ | head -20
+        else
+          echo "Build output not found!"
+          ls -la export/ || echo "Export directory not found"
+          exit 1
+        fi
+    
+    - name: Upload artifact
+      uses: actions/upload-pages-artifact@v2
+      with:
+        path: './docs'
     
     - name: Deploy to GitHub Pages
-      if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' || github.ref == 'refs/heads/remaster')
-      uses: peaceiris/actions-gh-pages@v3
-      with:
-        github_token: ${{ secrets.GITHUB_TOKEN }}
-        publish_dir: ./docs
-        cname: # Add your custom domain here if you have one
+      id: deployment
+      uses: actions/deploy-pages@v2
