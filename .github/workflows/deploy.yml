@@ -8,23 +8,20 @@ env:
   HAXE_VERSION: 4.2.5
 
 jobs:
-  build-and-deploy:
+  build:
+    if: "!contains(github.event.head_commit.message, '[skip ci]')"
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      pages: write
-      id-token: write
-    
+
     steps:
     - uses: actions/checkout@v3
       with:
         fetch-depth: 0
-    
+
     - name: Setup Haxe
       uses: krdlab/setup-haxe@v1
       with:
         haxe-version: ${{ env.HAXE_VERSION }}
-    
+
     - name: Install dependencies
       run: |
         haxelib newrepo
@@ -36,32 +33,27 @@ jobs:
         haxelib install hscript
         haxelib install polymod
         haxelib setup lime
-    
+
     - name: Build HTML5 Release
       run: lime build html5 -final
-      continue-on-error: false
-    
-    - name: Setup Pages
-      uses: actions/configure-pages@v3
-    
-    - name: Prepare deployment
+
+    - name: Copy build output to docs/game
       run: |
         mkdir -p docs/game
-        if [ -d "export/release/html5/bin" ]; then
-          cp -r export/release/html5/bin/* docs/game/
-          echo "Build copied successfully"
-          ls -la docs/game/ | head -20
-        else
-          echo "Build output not found!"
-          ls -la export/ || echo "Export directory not found"
-          exit 1
+        cp -r export/release/html5/bin/* docs/game/
+        ls -la docs/game | head -20
+
+    - name: Commit built game to docs
+      run: |
+        git config user.name "github-actions[bot]"
+        git config user.email "github-actions[bot]@users.noreply.github.com"
+        if git diff --quiet; then
+          echo "No changes to commit"
+          exit 0
         fi
-    
-    - name: Upload artifact
-      uses: actions/upload-pages-artifact@v1
-      with:
-        path: './docs'
-    
-    - name: Deploy to GitHub Pages
-      id: deployment
-      uses: actions/deploy-pages@v1
+        git add docs/game
+        git commit -m "Deploy game build to GitHub Pages [skip ci]"
+        git push origin HEAD:${{ github.ref }}
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
