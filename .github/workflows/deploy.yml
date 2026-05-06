@@ -35,7 +35,7 @@ jobs:
         haxelib setup lime
 
     - name: Build HTML5 Release
-      run: lime build html5 -final
+      run: haxelib run lime build html5 -final
 
     - name: Copy build output to docs/game
       run: |
